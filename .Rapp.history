@@ -1,0 +1,4 @@
+source("/Users/clairewillett/GeoTwit/sep_regions.r")
+source("/Users/clairewillett/GeoTwit/longlatregions_final.r")
+source("/Users/clairewillett/GeoTwit/tweet_frequencies_by_region.r")
+source("/Users/clairewillett/GeoTwit/longlatregions_final.r")

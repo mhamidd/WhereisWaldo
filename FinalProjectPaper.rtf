@@ -1,0 +1,345 @@
+{\rtf1\ansi\ansicpg1252\cocoartf1138\cocoasubrtf510
+{\fonttbl\f0\froman\fcharset0 TimesNewRomanPSMT;}
+{\colortbl;\red255\green255\blue255;\red38\green38\blue38;\red26\green26\blue26;}
+\margl1440\margr1440\vieww15140\viewh12460\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+
+\f0\fs24 \cf0 \
+Where is Waldo? Predicting Place on Twitter\
+\pard\pardeftab720
+\cf2 \
+	For most of America's history, our childhood and adult homes were one and the same, or nearly so. The known world was impenetrably vast, but the accessible world was small: a hamlet, a proper town,  perhaps a city, perhaps even two. The physical and cultural characteristics of our surroundings played an instrumental role in shaping our perspectives--in many cases, our home places played as instrumental a role as did the people who populated them. Imagine Willa Cather without Nebraska, Faulkner without Mississippi, Steinbeck without California. But first came steam, then electric rail, then telephones, then automobiles and airplanes and suburbs and sprawl and cell phones and the internet. Our nation shrunk, continues to shrink. From my home in New York City, I can fly to California in 6 hours, Hawaii in 9, Florida in 2.5. Better than that, I can have a video conference with a client in Shanghai, exchange instant messages with a friend in Auckland.\
+	These facts are known. What is less understood is the impact they have on our regional identities, on what Yi-Fu Tuan calls topophilia: "the affective bond between people and place or setting" (
+\i \cf2 Topophila: a Study of Environmental Perception
+\i0 \cf2 , 4). Does the homogenization of the region's man-made landscape impact our sense of the region as a distinct entity? Does the ubiquitous availability of instant communication? Marshall McCluhan thought so, warning, in 
+\i \cf2 Understanding Media
+\i0 \cf2 , that "\cf3 electronic interdependence recreates the world in the image of a 
+\b \cf0 global village," one where "
+\b0 'Time' has ceased, 'space' has vanished." \
+\cf2 	To find out not only if the global village was real, but where, and to what degree, I looked to twitter, the ubiquitous microblogging service that anyone with a feature phone can use. \cf0 \
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural
+\cf0 \
+Part 1: Getting and visualizing the raw data\
+\
+There are a number of ways to grab public Twitter data. I chose the easiest way of all: using data someone else had already grabbed. In this case, these someones were a team of Compsci post-docs from Carnegie Mellon, led by Jacob Eisenstein. Over the course of analyzing lexical variation on Twitter, Eisenstein et al amassed a dataset tailor-made for my purpose. The data consists of a week's worth of tweets from users who lived within the 48 contiguous states, had less than 1,000 followers, and had posted at least 20 times over that week--that is to say ordinary, frequent users of the service. \
+\
+In its original form, the data is a TXT file (full-text.txt in the GeoTwit repo) with fields containing the following information types:\
+1. Anonymized user ID\
+2. Publish date\
+3. UTM coordinates\
+4. Tweet body\
+\
+There were two aspects of this dataset that I was interested in visualizing. The first were the words themselves. The second was the number of tweets per region. \
+Specifically, as far as the first goes, I wanted to know about the words that regions shared in common--and words they did not. I used the Text Mining and ggplot2 packages in R to get these. As I was running out of time, I only visualized the words for two regions: the Mid Atlantic and Appalachia. I figured these would be interesting to compare because, while they are fairly close geographically, historically, they have had distinct dialects. \
+I modified Drew Conway's Better Wordcloud script to make the wordclouds. \
+I created a corpus consisting of the two feature word sets, loaded it, and created a term frequency matrix. \
+my.path <- ('~/GeoTwit/visualizations/')\
+library(tm)\
+my.corpus <- Corpus(DirSource(my.path), readerControl= list (reader=readPlain))\
+my_corpus.matrix <- TermDocumentMatrix(my.corpus)\
+\
+Then I put that corpus into a data frame and added a column for term frequency differences between Appalachia and Mid atlantic\
+my_corpus.df <- as.data.frame(inspect(my_corpus.matrix))\
+\
+#add column that displays term freq differences between appalachia and mid atlantic\
+my_corpus.df <- transform(my_corpus.df, freq.dif=mid_atlantic_words_viz.txt-appalachia_words_viz.txt)\
+\
+I subset that data frame into three data frames--one for words said more often in Mid Atlantic, one for words said more often in Appalachia, and one for words said equally. I created a function to get the space between the three frequencies, and then added that space back into the three data frames.\
+\
+optimal.spacing <- function(spaces) \{\
+	if(spaces>1) \{\
+        spacing<-1/spaces\
+        if(spaces%%2 > 0) \{\
+            lim<-spacing*floor(spaces/2)\
+            return(seq(-lim,lim,spacing))\
+        \}\
+        else \{\
+            lim<-spacing*(spaces-1)\
+            return(seq(-lim,lim,spacing*2))\
+        \}\
+    \}\
+    else \{\
+        return(0)\
+    \}\
+\}\
+\
+#apply spacing function to frequencies\
+mid_atlantic.spacing <- sapply(table(mid_atlantic.df$freq.dif), function(x) optimal.spacing(x))\
+appalachia.spacing <- sapply(table(appalachia.df$freq.dif), function(x) optimal.spacing(x))\
+equal.spacing<-sapply(table(equal.df$freq.dif), function(x) optimal.spacing(x))\
+\
+#now add that spacing back into dfs, where it will become the y column\
+mid_atlantic.optim <- rep(0, nrow(mid_atlantic.df))\
+for (n in names(mid_atlantic.spacing)) \{\
+	mid_atlantic.optim[which(mid_atlantic.df$freq.dif==as.numeric(n))] <- mid_atlantic.spacing[[n]]\
+\}\
+mid_atlantic.df <- transform(mid_atlantic.df, Spacing=mid_atlantic.optim)\
+\
+appalachia.optim <- rep(0, nrow(appalachia.df))\
+for (n in names(appalachia.spacing)) \{\
+	appalachia.optim[which(appalachia.df$freq.dif==as.numeric(n))] <- appalachia.spacing[[n]]\
+\}\
+appalachia.df <- transform(appalachia.df, Spacing=appalachia.optim)\
+\
+equal.df$Spacing <- as.vector(equal.spacing)\
+\
+Then, to create the word cloud, I used ggplot, and set x as the frequency difference and y as the spacing. \
+optim[which(mid_atlantic.df$freq.dif==as.numeric(n))] <- mid_atlantic.spacing[[n]]\
+\}\
+mid_atlantic.df <- transform(mid_atlantic.df, Spacing=mid_atlantic.optim)\
+\
+appalachia.optim <- rep(0, nrow(appalachia.df))\
+for (n in names(appalachia.spacing)) \{\
+	appalachia.optim[which(appalachia.df$freq.dif==as.numeric(n))] <- appalachia.spacing[[n]]\
+\}\
+appalachia.df <- transform(appalachia.df, Spacing=appalachia.optim)\
+\
+equal.df$Spacing <- as.vector(equal.spacing)\
+\
+\
+#visualize!\
+mid_atlantic_vs_appalachia <-  ggplot(mid_atlantic.df, aes(x=freq.dif, y=Spacing))+geom_text(aes(size=mid_atlantic_words_viz.txt, label=row.names(mid_atlantic.df), colour=freq.dif))+\
+\'a0\'a0\'a0\'a0geom_text(data=appalachia.df, aes(x=freq.dif, y=Spacing, label=row.names(appalachia.df), size=appalachia_words_viz.txt, color=freq.dif))+\
+\'a0\'a0\'a0\'a0geom_text(data=equal.df, aes(x=freq.dif, y=Spacing, label=row.names(equal.df), size=mid_atlantic_words_viz.txt, color=freq.dif))+\
+\'a0\'a0\'a0\'a0scale_size(range=c(3,11), name="Word Frequency")+scale_colour_gradient(low="darkred", high="darkblue", guide="none")+\
+\'a0\'a0\'a0\'a0scale_x_continuous(breaks=c(min(appalachia.df$freq.dif),0,max(mid_atlantic.df$freq.dif)),labels=c("Said More in Appalachia","Said Equally","Said More in Mid Atlantic"))+\
+\'a0\'a0\'a0\'a0scale_y_continuous(breaks=c(0),labels=c(""))+xlab("")+ylab("")+theme_bw(base_family= 'Helvetica')\
+ggsave(plot=mid_atlantic_vs_appalachia,filename="ma_app.png",width=13,height=7)\
+\
+Which resulted in this:\
+INSERT WORDCLOUD.\
+\
+The above code corresponds to the compare_words_wordcloud.r script in GeoTwit.\
+\
+\
+The second visualization was really simple. In the original dataset, if you recall, locations are given as longitude/latitude points. To see frequency, I just used the maps library to map the latitude and longitude onto a blank map of the US. \
+full_tweets <- read.table("full_text.txt", sep="\\t", quote="", row.names=NULL, stringsAsFactors = FALSE)\
+names(full_tweets) <- c('User', 'Date', 'Loc', 'Lat', 'Long', 'Tweet')\
+\
+#make map \
+map("usa", col="#f2f2f2", fill=TRUE, bg="white", lwd=0.05)\
+points(x=full_tweets$Long, y=full_tweets$Lat, col='red')\
+\
+#plot coordinates onto map\
+library(sp)\
+coordinates(full_tweets) <- c("lat", "long")\
+map('usa')\
+plot(full_tweets$lat, full_tweets$long)\
+\
+The above code corresponds to the tweet_frequencies_by_region.r script in GeoTwit.\
+\
+INSERT US MAP\
+\
+Because there are so many points, this isn't a particularly useful map. I need to reduce dimensions. \
+\
+\
+Part 2: Mapping coordinates to regions\
+\
+As I was interested in regions, rather than precise geographic coordinates, I mapped the UTM coordinates to states, and then mapped states to regions. I did this in R, using the spatial points, maps, and maptools library. The following function, adapted from ??? will take in a dataframe of longitude and latitude columns, convert it to a spatial polygons object, grab the indices of the spatial polygons object, and match them to their state names. \
+library(sp)\
+library(maps)\
+library(maptools)\
+latlong2state <- function(pointsDF) \{\
+states <- map('state', fill=TRUE, col = "transparent", plot=FALSE)\
+IDs <- sapply(strsplit(states$names, ":"), function(x) x[1])\
+states_sp <- map2SpatialPolygons(states, IDs=IDs, proj4string=CRS("+proj=longlat +datam=wgs84"))\
+\
+#convert pointsDF to a SpatialPoints object\
+points_sp <- SpatialPoints(pointsDF, proj4string=CRS("+proj=longlat + datum=wgs84"))\
+\
+# get indices of the Polygons object containing each point\
+indices <- over(points_sp, states_sp)\
+\
+# get state names of the PO\
+stateNames <- sapply(states_sp@polygons, function(x) x@ID)\
+stateNames[indices]\
+\}\
+\
+#run latlong2state over data\
+states <- latlong2state(splitUTM_fixed)\
+\
+I used some kind-of-quick and definitely-dirty regex to map the state names to the 10 regions. The following maps the states of New England:\
+states2reg <- gsub("maine|vermont|massachusetts|connecticut|new hampshire|rhode island", "New England", states)\
+Of course, I had to connect the regions back to the tweets, which I did by making the regions a data frame and binding it to the one containing the tweets and user IDs. Then, I split the bound data into training data and test data, and saved each as a csv. \
+\
+#merge regions into full tweets df\
+#first make it a df\
+states2reg <- as.data.frame(states2reg)\
+full_tweets_reg <- cbind(full_tweets, states2reg)\
+\
+#drop unnecessary columns\
+full_tweets_reg[2:5] <- list(NULL)\
+\
+#split this df into test and train and write both to csv\
+set.seed(50)\
+full_tweets_reg$fold <- sample(1:10, nrow(full_tweets_reg), replace=TRUE)\
+train <- subset(full_tweets_reg, fold != 3)\
+test <- subset(full_tweets_reg, fold==3)\
+write.csv(test, "tweet_reg_test.csv", row.names=FALSE)\
+write.csv(train, "tweet_reg_train.csv", row.names=FALSE)\
+\
+The above code corresponds to the longlatregions_final.r script in GeoTwit. \
+\
+\
+Part 3: Get the feature words\
+Initially, I'd wanted to bring in external regional word lists, but I ended up not doing this because a) such lists are neither free nor computer-readable, and b) using these word lists would answer the question: "Do people use traditional regional slang on Twitter?" but not necessarily the much broader and more flexible question of: "Do Twitter users exhibit geographic language patterns?"  \
+Instead, I created word lists from the tweets in the training data. First, in R, I ran some regex over the tweets to get rid of @ mentions. (While the question of whether @ mentions have geographic patterns is interesting, it's not in the scope of this project.) I subset the cleaned data by region, and saved each subset as a csv. \
+#remove ngrams containing @user_\
+regexp <- "@[a-zA-Z0-9_]*"\
+gsubtry <- gsub(pattern = regexp, replacement = "", x = train_data$Tweet)\
+\
+#merge gsubtry back into train_data, rename as Tweet\
+train_clean <- cbind(train_data, gsubtry)\
+train_clean[2] <- NULL\
+names(train_clean)[3] <- "Tweet"\
+\
+#convert factor df to character df\
+train_clean_char <- data.frame(lapply(train_clean, as.character), stringsAsFactors=FALSE)\
+\
+#split the data by row value\
+NewEngland <- subset(train_clean_char, Region=='New England')\
+\
+#export each df to csv\
+write.csv(NewEngland, file="New_England.csv")\
+\
+The above code corresponds to the all2reg.r script in GeoTwit.\
+\
+To get the feature words from the regional csvs, I used the Count Vectorizer from python's scikit learn library. For each region's tweets, the Count Vectorizer grabbed the 100 most common words, excepting stop words like "and" and "the." I tried grabbing bigrams as well, but the phrases returned weren't useful. I saved the words to csv files. \
+#load region data\
+filename = sys.argv[1]\
+train_data = pd.read_csv(filename)\
+\
+#convert Tweet column to string for vectorizer\
+train_data.Tweet = str(train_data.Tweet) \
+\
+from sklearn.feature_extraction.text import CountVectorizer\
+\
+#make vectorizer\
+word_vectorizer = CountVectorizer (stop_words = 'english', token_pattern=r'\\b\\w+\\b', max_features=100, min_df=1)\
+\
+text_features2 = word_vectorizer.fit_transform(train_data.Tweet)\
+\
+#get feature names\
+\
+words = word_vectorizer.get_feature_names()\
+\
+#save words to list\
+f = open(sys.argv[2], "w")\
+mylist = words\
+f.write("\\n".join(map(lambda x: str(x), words)))\
+f.close()\
+\
+The above code corresponds to the get_top_words.py script in GeoTWit.  \
+\
+\
+Part 4: Counting feature words\
+\
+So now I had my feature words and I had my tweets, and I wanted to know whether the presence and quantity of feature words in a given tweet was a decent predictor of the tweeter's home region. \
+In python, I built feature word counters for each region, using Mueller's BadWordsCounter from Kaggle's insult contest as a guide. For a given document (in my case, the training tweets), the counter runs through each tweet and counts the feature words per word in the tweet, then stores the sum of the words/tweet in a second list. \
+\
+class NEWordCounter(BaseEstimator):\
+	#open North words list\
+	def __init__(self):\
+		with open("ne_words.csv") as f:\
+			ne_words = [l.strip() for l in f.readlines()]\
+		self.ne_words_ = ne_words\
+\
+	def transform(self, documents):\
+		list = []\
+		for c in documents:\
+			sum_list = []\
+			\
+			for w in self.ne_words_:\
+			     #print w, " occurs ", str(c).lower().count(w), "times in ", str(c)\
+			     numOccur = [np.sum(str(c).lower().count(w))]\
+			     if (numOccur == None):\
+			         numOccur = []\
+			     \
+			     print sum_list.append(numOccur)\
+			list.append([np.sum(sum_list)])\
+			\
+		print "Here's the List: ", list\
+		return list\
+\
+The above code corresponds to the reg_words_check.py script and newordcounter.py script in GeoTwit. \
+\
+Still in python, I ran the feature word counters through the training and test tweets, and saved the count lists to csv files. \
+train_data = pd.read_csv('short_clean_train.csv')\
+#convert Tweets to strings of length 140 \
+train_data.dtypes	\
+datatypes = [('Unnamed: 0', 'float64'),('Unnamed: 1', 'float64'),('User', 'object'), ('Tweet', 'S140'), ('Region', 'object')]\
+\
+#reload in train set with correct dtypes\
+train = pd.read_csv('short_clean_train.csv', dtype=datatypes)\
+test = pd.read_csv('short_test.csv', dtype=test_datatypes)\
+\
+#define features\
+tweets = train.Tweet\
+\
+#run training tweets through region word counter\
+#get array of ratio of region word counts\
+ne = NEWordCounter()\
+custom = ne.transform(tweets)\
+test_custom = ne.transform(test_tweets)\
+\
+#save region word ratio as csv\
+my_custom = open("ne_wordcount.csv", 'wb')\
+wr_custom = csv.writer(my_custom)\
+wr_custom.writerows(custom)\
+\
+my_custom = open("ne_wordcount_test.csv", 'wb')\
+wr_custom = csv.writer(my_custom)\
+wr_custom.writerows(test_custom)\
+\
+The above code corresponds to the region_words_data.py script in GeoTwit. \
+\
+\
+I had wanted to join the word counts arrays to the training and test data in python, but errors and desire to see my data in tidy excel-like tables eventually steered me over to R. I loaded in the training and count csvs and bound them with column-bind. I used grepl to create new boolean columns for presence of region.Then, I was finally ready to predict!\
+I wanted to use glm in R, because I was predicting on a categorical variable, rather than a numeric one. \
+\
+The above code corresponds to the reg_predict_glm.r script in GeoTwit.\
+\
+\
+Part 5: Modeling and predicting on feature words\
+After all that prepping, the actual modeling was pretty easy. I'm guessing that's usually the case, in life as in machine learning. I split my training data into a train set and a test set with a 10:1 train data: test data ratio. \
+set.seed(43)\
+train_words_numbers$fold <- sample(1:10, nrow(train_words_numbers), replace=TRUE)\
+train <- subset(train_words_numbers, fold != 3)\
+test <- subset(train_words_numbers, fold == 3)\
+\
+As mentioned, I wanted to know if the number of a region's feature words in a given tweet could accurately predict the home location of that user. I used linear regression to model this:\
+model_glm <- glm(Is_New_England ~ New.England.Words, data = train, family='binomial')\
+Where New.England.Words was the number of New England words in a given tweet and New_England was the boolean is/is not New England column.\
+\
+I put the model to my test set:\
+test.predict <- predict(model_glm, test, type="response")\
+And evaluated the performance of those predictions using R's ROCR library. I wanted to know what percent of classifications were correct and the area under the curve.\
+library('ROCR')\
+pred <- prediction(test.predict, test$Is_New_England)\
+perf <- performance(pred, measure='acc')\
+plot (perf)\
+ADD RPLOT\
+perf_auc <- performance(pred, measure='auc')\
+\
+Sadly, the accuracy score for New England was only very slightly above 50%. \
+\
+My final linear regression model was trained on the full training set. \
+model_glm_final <- glm(Is_New_England ~ New.England.Words, data = train_words)\
+predictions <- predict(model_glm_final, test_words, type="response")\
+\
+Looking at the summary of predictions, which ranges from 2.7% to 2.9%, with a median of 2.87%, I can say that my New England words are poor predictors of New Englandness. \
+\
+So according to my model, presence of New England words were not great indicators of New England-ness. I tried again with Appalachia: same result.\
+\
+As such, I can't say yet whether feature words can be used to predict Twitter location. I would like to say, given the visual exploration and feature word extraction, for certain regions, the most distinct ones can be useful--ie "aye" and "hogie" in Appalachia, "bbm" and "prolly" in the Mid Atlantic, "watz" and "kalled" in the southwest, and, of course, the division between "lord" (South, Delmarva), and "god" (Mid Atlantic, The Midland). \
+This research also pointed to the potential of topics as regional identifiers. I didn't intentionally dig into these, but I noticed that Appalachians tweeted about cooking, Southerners tweeted about guns, Northwesterners tweeted about horses and the Broncos, and Mid-Atlantic and Midlanders tweeted about sex.\
+I'm sorry to say that everyone tweeted about Justin Bieber.\
+\
+\
+Part 6: Real-world implementation\
+ At present, only 1% of tweets are geotagged; a reliable, reasonably accurate way to predict geographic ties would be very useful to everyone from  marketers and advertisers looking to locally target users to law enforcement agencies trying to identify users. Of course, regions are much broader than states, or better yet, cities, but if this method is effective in a broad sense, it could be scaled down, given availability of training data. \
+\
+Ideally, this code (post-counter fix) would run client-side. I would want to clean up the scripts and make sure everything in them was able to be replicated before releasing it to the wild. I suppose it could serve as the source of a web-based client, where users could call the Twitter API, pull in tweets, and then see the visualized results of the code's analysis.\
+\
+Privacy is something I'd have to hammer out, though. In an academic setting, I like connecting dots, but in a real world setting, that may cause harm to users (see: Target's pregnant-teen reveal). \
+}
